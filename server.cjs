@@ -1,14 +1,13 @@
+// ✅ Updated server.js
 const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
 const { getFirestore } = require("firebase-admin/firestore");
+require("dotenv").config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ✅ Load service account key
-require("dotenv").config();
 
 admin.initializeApp({
   credential: admin.credential.cert({
@@ -18,31 +17,24 @@ admin.initializeApp({
   }),
 });
 
-
-// ✅ Firestore reference
 const db = getFirestore();
+const ADMIN_KEY = "super_secret_123";
 
-// 🔐 ADMIN SECRET KEY
-const ADMIN_KEY = "super_secret_123"; // Change this to something stronger
-
-// ✅ Send Notification Endpoint
 app.post("/sendNotification", async (req, res) => {
   console.log("🔔 Incoming request:", req.body);
 
   const { title, body, key } = req.body;
 
-  // ✅ Validate input
-  if (!title || !body || !key) {
-    return res.status(400).json({ success: false, error: "Missing title, body, or key" });
+  if (!title || !body) {
+    return res.status(400).json({ success: false, error: "Missing title or body" });
   }
 
-  // 🔐 Check admin key
-  if (key !== ADMIN_KEY) {
+  // If key exists in request, validate it. If not present, skip check.
+  if (key !== undefined && key !== ADMIN_KEY) {
     return res.status(403).json({ success: false, error: "Unauthorized request" });
   }
 
   try {
-    // ✅ Fetch all user FCM tokens from Firestore
     const snapshot = await db.collection("user").get();
     const tokens = snapshot.docs
       .map((doc) => doc.data().fcmToken)
@@ -52,9 +44,12 @@ app.post("/sendNotification", async (req, res) => {
       return res.status(400).json({ success: false, error: "No valid FCM tokens found" });
     }
 
-    // ✅ Notification message payload
     const message = {
-      notification: { title, body },
+      notification: {
+        title,
+        body,
+        image: "https://mkenterprices.vercel.app/images/logo.jpg",
+      },
       android: {
         priority: "high",
         notification: {
@@ -72,11 +67,11 @@ app.post("/sendNotification", async (req, res) => {
       webpush: {
         notification: {
           icon: "https://mkenterprices.vercel.app/images/logo.jpg",
+          image: "https://mkenterprices.vercel.app/images/logo.jpg",
         },
       },
     };
 
-    // ✅ Send notifications to all tokens
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
       ...message,
@@ -90,7 +85,6 @@ app.post("/sendNotification", async (req, res) => {
   }
 });
 
-// ✅ Start server
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
