@@ -8,12 +8,16 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ Load service account key
-const serviceAccount = require("./serviceAccountKey.json");
+require("dotenv").config();
 
-// ✅ Initialize Firebase Admin
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  }),
 });
+
 
 // ✅ Firestore reference
 const db = getFirestore();
