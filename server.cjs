@@ -85,11 +85,13 @@ app.post("/sendNotification", async (req, res) => {
   }
 });
 
-const PORT = 5000;
-
+// ✅ Root route for testing
 app.get("/", (req, res) => {
   res.send("✅ mkenterprises-backend is live and working!");
 });
+
+const PORT = 5000;
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
