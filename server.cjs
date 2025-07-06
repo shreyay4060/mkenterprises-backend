@@ -47,11 +47,10 @@ app.post("/sendNotification", async (req, res) => {
       return res.status(400).json({ success: false, error: "No valid FCM tokens found" });
     }
 
-    // ✅ Loop over tokens and send notifications individually
-    let successCount = 0;
-    for (const token of tokens) {
-      try {
-        await admin.messaging().send({
+    // ✅ Send to each token individually (Spark plan friendly)
+    const results = await Promise.all(
+      tokens.map((token) =>
+        admin.messaging().send({
           token,
           notification: {
             title,
@@ -64,12 +63,14 @@ app.post("/sendNotification", async (req, res) => {
               image: "https://mkenterprices.vercel.app/images/logo.jpg",
             },
           },
-        });
-        successCount++;
-      } catch (err) {
-        console.error(`❌ Failed to send to token ${token}:`, err.message);
-      }
-    }
+        }).then(() => ({ success: true })).catch((err) => {
+          console.error(`❌ Failed to send to token ${token}:`, err.message);
+          return { success: false, error: err.message };
+        })
+      )
+    );
+
+    const successCount = results.filter(r => r.success).length;
 
     console.log(`✅ Notifications sent: ${successCount}`);
     res.json({ success: true, sent: successCount });
