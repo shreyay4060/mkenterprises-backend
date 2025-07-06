@@ -47,25 +47,32 @@ app.post("/sendNotification", async (req, res) => {
       return res.status(400).json({ success: false, error: "No valid FCM tokens found" });
     }
 
-    const message = {
-      tokens, // ✅ FCM expects this field
-      notification: {
-        title,
-        body,
-      },
-      webpush: {
-        notification: {
-          icon: "https://mkenterprices.vercel.app/images/logo.jpg",
-          badge: "https://mkenterprices.vercel.app/images/logo.jpg",
-          image: "https://mkenterprices.vercel.app/images/logo.jpg",
-        },
-      },
-    };
+    // ✅ Loop over tokens and send notifications individually
+    let successCount = 0;
+    for (const token of tokens) {
+      try {
+        await admin.messaging().send({
+          token,
+          notification: {
+            title,
+            body,
+          },
+          webpush: {
+            notification: {
+              icon: "https://mkenterprices.vercel.app/images/logo.jpg",
+              badge: "https://mkenterprices.vercel.app/images/logo.jpg",
+              image: "https://mkenterprices.vercel.app/images/logo.jpg",
+            },
+          },
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`❌ Failed to send to token ${token}:`, err.message);
+      }
+    }
 
-    const response = await admin.messaging().sendMulticast(message);
-
-    console.log(`✅ Notifications sent: ${response.successCount}`);
-    res.json({ success: true, sent: response.successCount });
+    console.log(`✅ Notifications sent: ${successCount}`);
+    res.json({ success: true, sent: successCount });
   } catch (err) {
     console.error("❌ Error sending notification:", err.message);
     res.status(500).json({ success: false, error: err.message });
