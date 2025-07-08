@@ -6,7 +6,14 @@ const { getFirestore } = require("firebase-admin/firestore");
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+
+// ✅ Secure CORS setup for your Vercel frontend
+app.use(cors({
+  origin: "https://mkenterprices.vercel.app", // ✅ exact frontend URL
+  methods: ["GET", "POST"],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // ✅ Initialize Firebase Admin
@@ -31,7 +38,6 @@ app.post("/sendNotification", async (req, res) => {
     return res.status(400).json({ success: false, error: "Missing title or body" });
   }
 
-  // ✅ Authorization check
   if (key !== undefined && key !== ADMIN_KEY) {
     return res.status(403).json({ success: false, error: "Unauthorized request" });
   }
@@ -47,7 +53,7 @@ app.post("/sendNotification", async (req, res) => {
       return res.status(400).json({ success: false, error: "No valid FCM tokens found" });
     }
 
-    // ✅ Send to each token individually (Spark plan friendly)
+    // ✅ Send to each token individually
     const results = await Promise.all(
       tokens.map((token) =>
         admin.messaging().send({
