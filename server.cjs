@@ -1,30 +1,22 @@
-// ✅ server.js
 const express = require("express");
 const admin = require("firebase-admin");
-const cors = require("cors");
 const { getFirestore } = require("firebase-admin/firestore");
 require("dotenv").config();
 
 const app = express();
 
-// ✅ Fix: Use dynamic CORS middleware with proper headers
+// ✅ Strict CORS configuration for production frontend
 const allowedOrigins = ["https://mkenterprices.vercel.app"];
-
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
-
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  // ✅ Handle preflight OPTIONS request
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
@@ -40,61 +32,63 @@ admin.initializeApp({
 });
 
 const db = getFirestore();
-const ADMIN_KEY = "super_secret_123";
+const ADMIN_KEY = "super_secret_123"; // Consider moving this to .env for security
 
-// ✅ POST: /sendNotification
+// ✅ Send Notification Endpoint
 app.post("/sendNotification", async (req, res) => {
   console.log("🔔 Incoming request:", req.body);
-
   const { title, body, key } = req.body;
 
   if (!title || !body) {
     return res.status(400).json({ success: false, error: "Missing title or body" });
   }
 
-  if (key !== undefined && key !== ADMIN_KEY) {
+  if (key !== ADMIN_KEY) {
     return res.status(403).json({ success: false, error: "Unauthorized request" });
   }
 
   try {
     const snapshot = await db.collection("user").get();
-
     const tokens = snapshot.docs
-      .map((doc) => doc.data().fcmToken)
-      .filter((token) => typeof token === "string" && token.trim() !== "");
+      .map(doc => doc.data().fcmToken)
+      .filter(token => typeof token === "string" && token.trim() !== "");
 
-    if (tokens.length === 0) {
+    if (!tokens.length) {
       return res.status(400).json({ success: false, error: "No valid FCM tokens found" });
     }
 
     const results = await Promise.all(
-      tokens.map((token) =>
+      tokens.map(token =>
         admin
           .messaging()
           .send({
             token,
-            notification: {
+            data: {
               title,
               body,
+              icon: "https://mkenterprices.vercel.app/images/logo.jpg",
+              image: "https://mkenterprices.vercel.app/images/logo.jpg",
+              click_action: "https://mkenterprices.vercel.app",
+            },
+            android: {
+              priority: "high",
             },
             webpush: {
-              notification: {
-                icon: "https://mkenterprices.vercel.app/images/logo.jpg",
-                badge: "https://mkenterprices.vercel.app/images/logo.jpg",
-                image: "https://mkenterprices.vercel.app/images/logo.jpg",
+              headers: {
+                Urgency: "high",
+                TTL: "60",
               },
             },
           })
           .then(() => ({ success: true }))
-          .catch((err) => {
+          .catch(err => {
             console.error(`❌ Failed to send to token ${token}:`, err.message);
             return { success: false, error: err.message };
           })
       )
     );
 
-    const successCount = results.filter((r) => r.success).length;
-
+    const successCount = results.filter(r => r.success).length;
     console.log(`✅ Notifications sent: ${successCount}`);
     res.json({ success: true, sent: successCount });
   } catch (err) {
@@ -108,7 +102,7 @@ app.get("/", (req, res) => {
   res.send("✅ mkenterprises-backend is live and working!");
 });
 
-// ✅ Start Server
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
